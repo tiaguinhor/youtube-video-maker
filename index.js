@@ -4,9 +4,12 @@ const robots = {
 };
 
 async function start() {
-  const content = {};
-  content.searchTerm = askAndReturnSearchTerm();
-  content.prefix = askAndReturnPrefix();
+  const content = {
+    maximumSentences: 7
+  };
+
+  (content.searchTerm = askAndReturnSearchTerm()),
+    (content.prefix = askAndReturnPrefix());
 
   await robots.text(content);
 
@@ -23,6 +26,8 @@ async function start() {
 
     return prefixes[selectedPrefixIndex];
   }
+
+  console.log(JSON.stringify(content, null, 4));
 }
 
 start();

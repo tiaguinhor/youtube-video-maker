@@ -1,21 +1,69 @@
-const algorithmia = require('readline-sync');
-const algorithmiaApiKey = require('../credentials/algorithmia.json').apiKey;
+const algorithmia = require('algorithmia');
+const algorithmiaApiKey = require('../credentials/algorithmia.json').apikey;
+const watsonJson = require('../credentials/watson.json');
 const sentenceBoundaryDetection = require('sbd');
+const NaturalLanguageUnderstandingV1 = require('watson-developer-cloud/natural-language-understanding/v1.js');
+
+const nlu = new NaturalLanguageUnderstandingV1({
+  iam_apikey: watsonJson.apikey,
+  version: '2018-04-05',
+  url: watsonJson.url
+});
 
 async function robot(content) {
   await fetchContentFromWikipedia(content);
-  await sanitizeContent(content);
-  await breakContentIntoSentences(content);
+  sanitizeContent(content);
+  breakContentIntoSentences(content);
+  limitMaximumSentences(content);
+  await fetchAllSentenceKeywords(content);
+
+  async function fetchAllSentenceKeywords(content) {
+    console.log('> [text-robot] Starting to fetch keywords from Watson');
+
+    for (const sentence of content.sentences) {
+      console.log(`> [text-robot] Sentence: "${sentence.text}"`);
+      sentence.keywords = await fetchWatsonAndReturnKeywords(sentence.text);
+      console.log(`> [text-robot] Keywords: ${sentence.keywords.join(', ')}\n`);
+    }
+  }
+
+  async function fetchWatsonAndReturnKeywords(sentence) {
+    return new Promise((resolve, reject) => {
+      nlu.analyze(
+        {
+          text: sentence,
+          features: {
+            keywords: {}
+          }
+        },
+        (error, response) => {
+          if (error) {
+            reject(error);
+            return;
+          }
+
+          const keywords = response.keywords.map(keyword => {
+            return keyword.text;
+          });
+
+          resolve(keywords);
+        }
+      );
+    });
+  }
 
   async function fetchContentFromWikipedia(content) {
-    const algorithmiaAuthenticate = algorithmia(algorithmiaApiKey);
-    const wikipediaAlgorithm = algorithmiaAuthenticate.algo(
+    console.log('> [text-robot] Fetching content from Wikipedia');
+
+    const algorithmiaAuthenticated = algorithmia(algorithmiaApiKey);
+    const wikipediaAlgorithm = algorithmiaAuthenticated.algo(
       'web/WikipediaParser/0.1.2'
     );
     const wikipediaResponse = await wikipediaAlgorithm.pipe(content.searchTerm);
     const wikipediaContent = wikipediaResponse.get();
 
     content.sourceContentOriginal = wikipediaContent.content;
+    console.log('> [text-robot] Fetching done!');
   }
 
   async function sanitizeContent(content) {
@@ -56,6 +104,10 @@ async function robot(content) {
 
   function removeDatesInParentheses(text) {
     return text.replace(/\((?:\([^()]*\)|[^()])*\)/gm, '').replace(/  /g, ' ');
+  }
+
+  function limitMaximumSentences(content) {
+    content.sentences = content.sentences.slice(0, content.maximumSentences);
   }
 }
 
