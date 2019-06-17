@@ -3,6 +3,7 @@ const algorithmiaApiKey = require('../credentials/algorithmia.json').apikey;
 const watsonJson = require('../credentials/watson.json');
 const sentenceBoundaryDetection = require('sbd');
 const NaturalLanguageUnderstandingV1 = require('watson-developer-cloud/natural-language-understanding/v1.js');
+const state = require('./state');
 
 const nlu = new NaturalLanguageUnderstandingV1({
   iam_apikey: watsonJson.apikey,
@@ -10,20 +11,20 @@ const nlu = new NaturalLanguageUnderstandingV1({
   url: watsonJson.url
 });
 
-async function robot(content) {
+async function robot() {
+  const content = state.load();
+
   await fetchContentFromWikipedia(content);
   sanitizeContent(content);
   breakContentIntoSentences(content);
   limitMaximumSentences(content);
   await fetchAllSentenceKeywords(content);
 
-  async function fetchAllSentenceKeywords(content) {
-    console.log('> [text-robot] Starting to fetch keywords from Watson');
+  state.save(content);
 
+  async function fetchAllSentenceKeywords(content) {
     for (const sentence of content.sentences) {
-      console.log(`> [text-robot] Sentence: "${sentence.text}"`);
       sentence.keywords = await fetchWatsonAndReturnKeywords(sentence.text);
-      console.log(`> [text-robot] Keywords: ${sentence.keywords.join(', ')}\n`);
     }
   }
 
