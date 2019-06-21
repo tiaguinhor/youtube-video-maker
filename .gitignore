@@ -1,4 +1,5 @@
 /node_modules/
 /credentials/
-content.json
 /content/
+content.json
+config.json
